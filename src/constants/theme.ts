@@ -7,6 +7,25 @@ import '@/global.css';
 
 import { Platform } from 'react-native';
 
+export const Palette = {
+  primary: {
+    brand: '#FDC026',
+  },
+  accent: {
+    500: '#76B8E0',
+  },
+  background: {
+    default: '#141414',
+    muted: '#1C1C1E',
+    highlight: '#2C2A30',
+    depth: '#0A0A0A',
+  },
+  text: {
+    primary: '#EBEBEB',
+    secondary: '#8A8A8A',
+  },
+} as const;
+
 export const Colors = {
   light: {
     text: '#000000',
