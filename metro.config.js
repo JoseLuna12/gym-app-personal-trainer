@@ -1,22 +1,33 @@
 const { getDefaultConfig } = require('expo/metro-config');
 const path = require('path');
 
-const designSystemPath = path.resolve(__dirname, '../pt-design-system');
+const designSystemPath = path.resolve(__dirname, '../design-system');
 
 const config = getDefaultConfig(__dirname);
 
 config.watchFolders = [designSystemPath];
 config.resolver.unstable_enableSymlinks = true;
-// Let Metro find gympairo's node_modules when resolving deps from pt-design-system
+// Let Metro find gympairo's node_modules when resolving deps from design-system
 config.resolver.nodeModulesPaths = [path.resolve(__dirname, 'node_modules')];
 config.resolver.extraNodeModules = {
   '@jlunamena/design-system': designSystemPath,
   'react': path.resolve(__dirname, 'node_modules/react'),
   'react-native': path.resolve(__dirname, 'node_modules/react-native'),
   'react-native-svg': path.resolve(__dirname, 'node_modules/react-native-svg'),
+  '@shopify/react-native-skia': path.resolve(__dirname, 'node_modules/@shopify/react-native-skia'),
 };
 
 const gympairoModules = path.resolve(__dirname, 'node_modules');
+const skiaSourceEntry = path.resolve(
+  __dirname,
+  'node_modules/@shopify/react-native-skia/src/index.ts'
+);
+const singletonModules = new Set([
+  '@shopify/react-native-skia',
+  'react',
+  'react-native',
+  'react-native-svg',
+]);
 
 const expoResolveRequest = config.resolver.resolveRequest;
 config.resolver.resolveRequest = (context, moduleName, platform) => {
@@ -30,17 +41,28 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
     };
   }
 
-  // Any require() originating from pt-design-system resolves via gympairo's
-  // node_modules so React/RN/SVG are always the same instance as the app.
-  if (context.originModulePath?.startsWith(designSystemPath)) {
-    try {
-      return {
-        filePath: require.resolve(moduleName, { paths: [gympairoModules] }),
-        type: 'sourceFile',
-      };
-    } catch {
-      // not in gympairo node_modules — fall through
-    }
+  // Skia must resolve to its React Native source entry so Metro respects the
+  // package's native codegen path instead of Node's "main" field.
+  if (
+    context.originModulePath?.startsWith(designSystemPath) &&
+    moduleName === '@shopify/react-native-skia'
+  ) {
+    return {
+      filePath: skiaSourceEntry,
+      type: 'sourceFile',
+    };
+  }
+
+  // Keep React/RN/SVG single-instanced, but let Metro resolve relative source
+  // files and image assets from design-system normally.
+  if (
+    context.originModulePath?.startsWith(designSystemPath) &&
+    singletonModules.has(moduleName)
+  ) {
+    return {
+      filePath: require.resolve(moduleName, { paths: [gympairoModules] }),
+      type: 'sourceFile',
+    };
   }
 
   if (expoResolveRequest) return expoResolveRequest(context, moduleName, platform);
